@@ -1,0 +1,43 @@
+using AOSharp.Core;
+using AOSharp.Core.UI;
+using Path = System.IO.Path;
+
+public class Main : AOPluginEntry
+{
+    private static InventoryDb? _db;
+    private WebSocketServer _webServer;
+    public override void Run()
+    {
+        try
+        {
+            Chat.WriteLine("Mali's Item Assistant - Net");
+
+            Directory.SetCurrentDirectory(PluginDirectory);
+
+            SQLitePCL.Batteries_V2.Init();
+
+            var dbPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AOSharp", "MalisItemAssistant", "items.db");
+
+            Directory.CreateDirectory(Path.GetDirectoryName(dbPath)!);
+
+            _db = new InventoryDb(dbPath);
+            _db.UpsertCharacter(DynelManager.LocalPlayer.Identity.Instance, DynelManager.LocalPlayer.Name);
+
+            _webServer = new WebSocketServer(7068, _db);
+
+            ItemTrack.Start(_db);
+            _webServer.Start();
+        }
+        catch (Exception ex)
+        {
+            Chat.WriteLine($"[MIA] Failed to start: {ex.Message}");
+        }
+    }
+
+    public override void Teardown()
+    {
+        ItemTrack.Stop();
+        _db?.Dispose();
+        _webServer?.Stop();
+    }
+}
