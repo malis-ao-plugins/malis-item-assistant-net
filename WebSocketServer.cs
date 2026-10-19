@@ -39,7 +39,6 @@ public class WebSocketServer
             try
             {
                 _listener.Start();
-                Chat.WriteLine($"WS server started http://localhost:{_port}");
                 while (_listener.IsListening)
                 {
                     try
@@ -193,7 +192,6 @@ public class WebSocketServer
                 var json = Encoding.UTF8.GetString(buffer, 0, result.Count);
                 var doc = JsonDocument.Parse(json);
                 var root = doc.RootElement;
-                Chat.WriteLine(json);
 
                 switch (root.GetProperty("type").GetString())
                 {
