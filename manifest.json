@@ -1,5 +1,5 @@
 {
   "author": "Malishade",
   "description": "Item Assistant",
-  "dependencies": []
+  "dependencies": [ "https://github.com/malis-ao-plugins/malis-ao-toolkit-web/plugin/MalisToolkitPage.csproj" ]
 }

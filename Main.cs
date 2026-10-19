@@ -6,6 +6,7 @@ public class Main : AOPluginEntry
 {
     private static InventoryDb? _db;
     private WebSocketServer _webServer;
+    private WebPageServer? _page;
     public override void Run()
     {
         try
@@ -27,6 +28,8 @@ public class Main : AOPluginEntry
 
             ItemTrack.Start(_db);
             _webServer.Start();
+            _page = new WebPageServer();
+            _page.Start();
         }
         catch (Exception ex)
         {
@@ -39,5 +42,6 @@ public class Main : AOPluginEntry
         ItemTrack.Stop();
         _db?.Dispose();
         _webServer?.Stop();
+        _page?.Stop();
     }
 }
