@@ -6,8 +6,8 @@ using Path = System.IO.Path;
 public class Main : AOPluginEntry
 {
     private static InventoryDb? _db;
-    private WebSocketServer _webServer;
-    private WebPageServer? _page;
+    private InventoryHttpServer? _queries;
+    private ToolkitApp? _app;
     public override void Run()
     {
         try
@@ -25,7 +25,8 @@ public class Main : AOPluginEntry
             _db = new InventoryDb(dbPath);
             _db.UpsertCharacter(DynelManager.LocalPlayer.Identity.Instance, DynelManager.LocalPlayer.Name);
 
-            _webServer = new WebSocketServer(7068, _db);
+            _queries = new InventoryHttpServer(7068, _db);
+            _app = ToolkitHub.Register("app_7068");
 
             // The page fetches over HTTP and re-fetches when told. It is told
             // after every committed change, and once on connect so a page that
@@ -35,13 +36,12 @@ public class Main : AOPluginEntry
                 type = "inventoryChanged",
                 characterId = DynelManager.LocalPlayer.Identity.Instance,
             });
-            _db.Changed += () => _webServer.Broadcast(changed);
-            _webServer.OnClientConnected += () => _webServer.Broadcast(changed);
+            var app = _app;
+            _db.Changed += () => app.Send(changed);
+            app.PageConnected += () => app.Send(changed);
 
             ItemTrack.Start(_db);
-            _webServer.Start();
-            _page = new WebPageServer();
-            _page.Start();
+            _queries.Start();
         }
         catch (Exception ex)
         {
@@ -53,7 +53,7 @@ public class Main : AOPluginEntry
     {
         ItemTrack.Stop();
         _db?.Dispose();
-        _webServer?.Stop();
-        _page?.Stop();
+        _queries?.Stop();
+        _app?.Dispose();
     }
 }
