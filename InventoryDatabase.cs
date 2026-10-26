@@ -188,6 +188,23 @@ public class InventoryDb : IDisposable
                 ["@slot"] = slot
             });
     }
+    /// <summary>
+    /// Drops every bank row for the character, ahead of re-adding what the bank
+    /// holds now. Writes run in order, so the re-adds land after the delete.
+    /// </summary>
+    public void ClearBank(int characterId)
+    {
+        Execute(
+            @"DELETE FROM item_slot
+          WHERE character_id = @cid
+            AND parent_type  = @ptype",
+            new()
+            {
+                ["@cid"] = characterId,
+                ["@ptype"] = (int)IdentityType.Bank
+            });
+    }
+
     public List<Dictionary<string, object?>> GetCharacters()
     {
         return Query("SELECT id, name, last_seen FROM character ORDER BY name");
@@ -256,6 +273,11 @@ public class InventoryDb : IDisposable
             return (fallback, IdentityType.Backpack, slot);
         }
 
+        // The client names a bank slot by reference; rows are stored under the
+        // bank itself (see ItemTrack.TryGetItem), so delete under that type.
+        if (slotIdentity.Type == IdentityType.BankByRef)
+            return (characterId, IdentityType.Bank, slotIdentity.Instance);
+
         return (characterId, slotIdentity.Type, slotIdentity.Instance);
     }
 
@@ -284,10 +306,18 @@ public class InventoryDb : IDisposable
 
     // ── Batch transaction ────────────────────────────────────────────────────
 
+    /// <summary>
+    /// Raised after a batch of writes is committed, off the game thread. A batch
+    /// closes 50 ms after its last write, so a burst of moves raises it once.
+    /// </summary>
+    public event Action? Changed;
+
     private void FlushBatch()
     {
+        bool committed;
         lock (_batchLock)
         {
+            committed = _batchTx != null;
             _batchTx?.Commit();
             _batchTx?.Dispose();
             _batchCon?.Dispose();
@@ -296,6 +326,9 @@ public class InventoryDb : IDisposable
             _batchCon = null;
             _batchTimer = null;
         }
+
+        if (committed)
+            Changed?.Invoke();
     }
 
     private SqliteConnection BeginOrJoinBatch()

@@ -141,7 +141,9 @@ public class WebSocketServer
     public void Broadcast(string json)
     {
         var bytes = Encoding.UTF8.GetBytes(json);
-        foreach (var client in _clients.ToList())
+        List<WebSocket> clients;
+        lock (_clients) clients = _clients.ToList();
+        foreach (var client in clients)
         {
             if (client.State == WebSocketState.Open)
                 client.SendAsync(bytes, WebSocketMessageType.Text, true, _cts.Token);
@@ -175,7 +177,7 @@ public class WebSocketServer
     private async Task HandleClientAsync(HttpListenerContext ctx)
     {
         var wsCtx = await ctx.AcceptWebSocketAsync(null);
-        _clients.Add(wsCtx.WebSocket);
+        lock (_clients) _clients.Add(wsCtx.WebSocket);
         OnClientConnected?.Invoke();
         var ws = wsCtx.WebSocket;
         var buffer = new byte[4096];
@@ -204,6 +206,6 @@ public class WebSocketServer
             }
         }
 
-        _clients.Remove(ws);
+        lock (_clients) _clients.Remove(ws);
     }
 }

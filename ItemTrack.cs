@@ -26,9 +26,22 @@ public class ItemTrack
         foreach (var item in Inventory.Items)
             ItemAdded(item.Slot);
 
-        if (Inventory.Bank.IsOpen)
-            foreach (var item in Inventory.Bank.Items)
-                ItemAdded(item.Slot);
+        SyncBank();
+    }
+
+    /// <summary>
+    /// Replaces the character's bank rows with what the bank holds now. Only
+    /// possible while it is open; done on start and every time it opens, so
+    /// rows left by a missed removal do not outlive the next visit.
+    /// </summary>
+    private static void SyncBank()
+    {
+        if (_inventoryDb == null || !Inventory.Bank.IsOpen)
+            return;
+
+        _inventoryDb.ClearBank(DynelManager.LocalPlayer.Identity.Instance);
+        foreach (var item in Inventory.Bank.Items)
+            ItemAdded(item.Slot);
     }
 
     public static void Stop()
@@ -42,6 +55,18 @@ public class ItemTrack
     {
         if (e is InventoryUpdateMessage msg)
             _handleToIdentity[msg.Handle] = msg.InventoryIdentity.Instance;
+
+        // Sent with the bank's contents when it opens. Messages reach plugins on
+        // the frame after the client applied them, so the bank already holds
+        // them. A bank that reads empty while the message lists slots has not
+        // caught up, and clearing on it would wipe every row.
+        if (e is BankMessage bank)
+        {
+            if (Inventory.Bank.Items.Count == 0 && bank.BankSlots?.Length > 0)
+                return;
+
+            SyncBank();
+        }
     }
 
     private static void ItemAdded(Identity itemSlot)
